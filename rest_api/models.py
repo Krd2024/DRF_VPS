@@ -1,6 +1,6 @@
-import uuid
-from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.db import models
+import uuid
 
 
 class Server(models.Model):
