@@ -45,6 +45,7 @@ class ServerSerializerSet(viewsets.ModelViewSet):
 
         # Фильтрация по статусу
         status = self.request.query_params.get("status", None)
+        print(status, "< ---- status")
         if status is not None:
             queryset = queryset.filter(status__iexact=status)
 
@@ -86,10 +87,9 @@ class ServerSerializerSet(viewsets.ModelViewSet):
 
         # Получаем VPS по ID
         vps = get_object_or_404(Server, pk=pk)
-
+        vps = self.get_object()
         # Сериализуем найденную VPS
         serializer = ServerSerializer(vps)
-
         # Возвращаем сериализованные данные
         return Response(serializer.data)
 
@@ -109,8 +109,24 @@ class ServerSerializerSet(viewsets.ModelViewSet):
                 required=False,
                 type=int,
             ),
+            OpenApiParameter(
+                name="status",
+                description="Фильтр по статусу (started, blocked, stopped) ",
+                required=False,
+                type=str,
+            ),
         ],
         responses={200: ServerSerializer(many=True)},
     )
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+
+    @extend_schema(
+        summary="Обновить статус",
+        description="Обновляет статус сервера по ID (в теле запроса).",
+        request=ServerSerializer,
+        responses={200: ServerSerializer},
+    )
+    def partial_update(self, request, *args, **kwargs):
+
+        return super().partial_update(request, *args, **kwargs)
