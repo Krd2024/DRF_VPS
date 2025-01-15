@@ -1,5 +1,6 @@
 import uuid
-from drf_spectacular.utils import extend_schema, OpenApiExample
+from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from rest_framework.response import Response
 from .serializers import ServerSerializer
 from .models import Server
@@ -7,7 +8,7 @@ from rest_framework import viewsets
 from rest_framework import status
 
 
-class ServerSerializerSet(viewsets.ViewSet):
+class ServerSerializerSet(viewsets.ModelViewSet):
     """
     ViewSet для выполнения CRUD операций с моделью Server.
 
@@ -19,6 +20,35 @@ class ServerSerializerSet(viewsets.ViewSet):
     """
 
     queryset = Server.objects.all()
+    serializer_class = ServerSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # queryset = Server.objects.all()
+
+        print(self.request.query_params)
+
+        # Фильтрация по CPU (cpu >= значение)
+        cpu = self.request.query_params.get("cpu", None)
+        if cpu is not None:
+            queryset = queryset.filter(cpu__gte=int(cpu))
+
+        # Фильтрация по оперативной памяти (ram >= значение)
+        ram = self.request.query_params.get("ram", None)
+        if ram is not None:
+            queryset = queryset.filter(ram__gte=int(ram))
+
+        # Фильтрация по HDD (hdd >= значение)
+        hdd = self.request.query_params.get("hdd", None)
+        if hdd is not None:
+            queryset = queryset.filter(hdd__gte=int(hdd))
+
+        # Фильтрация по статусу
+        status = self.request.query_params.get("status", None)
+        if status is not None:
+            queryset = queryset.filter(status__iexact=status)
+
+        return queryset
 
     @extend_schema(
         summary="Создаёт VPS",
@@ -44,3 +74,43 @@ class ServerSerializerSet(viewsets.ViewSet):
 
         # Если данные не валидны, возвращаем ошибки сериализатора с HTTP статусом 400 (Bad Request)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @extend_schema(
+        summary="Возвращает одну запись.",
+        description="Возвращает одну запись по ID .",
+        request=ServerSerializer,
+        responses={200: ServerSerializer},
+    )
+    def retrieve(self, request, pk=None):
+        """Чтение одной записи"""
+
+        # Получаем VPS по ID
+        vps = get_object_or_404(Server, pk=pk)
+
+        # Сериализуем найденную VPS
+        serializer = ServerSerializer(vps)
+
+        # Возвращаем сериализованные данные
+        return Response(serializer.data)
+
+    @extend_schema(
+        summary="Получить список всех серверов с поддержкой фильтрации",
+        description="Возвращает список всех серверов с поддержкой фильтрации по оперативной памяти и SSD.",
+        parameters=[
+            OpenApiParameter(
+                name="ram",
+                description="Фильтр по оперативной памяти (>= значение в ГБ)",
+                required=False,
+                type=int,
+            ),
+            OpenApiParameter(
+                name="ssd",
+                description="Фильтр по SSD (>= значение в ГБ)",
+                required=False,
+                type=int,
+            ),
+        ],
+        responses={200: ServerSerializer(many=True)},
+    )
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
